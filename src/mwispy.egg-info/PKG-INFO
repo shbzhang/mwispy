@@ -1,3 +1,16 @@
+Metadata-Version: 2.1
+Name: mwispy
+Version: 1.0.5
+Summary: Tools for MWISP data reduction.
+Author-email: Shaobo Zhang <shbzhang@pmo.ac.cn>
+Project-URL: Homepage, https://github.com/shbzhang/mwispy
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
 # mwispy
 ``mwispy`` derives from the [Milky Way Imaging Scroll Painting (MWISP) project](https://ui.adsabs.harvard.edu/abs/2019ApJS..240....9S).
 

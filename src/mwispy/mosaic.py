@@ -99,12 +99,12 @@ def mosaic(*crange, sb='U', path=None, prefix='', suffix='.fits', \
 	Examples
 	--------
 	>>> pa = ['./', '/share/data/mwisp/G020+00', '/share/data/mwisp/G030+00']
-	>>> mwisp.mosaic(29, 32.5, -1, 1.2, -30, 30, sb='L', path=pa, output='Test', silent=True)
+	>>> mwispy.mosaic(29, 32.5, -1, 1.2, -30, 30, sb='L', path=pa, output='Test', silent=True)
 	'''
 
 	###Syntax prompt
 	if len(crange) != 6 and undone is None:
-		print("Syntax - mosaic(l1, l2, b1, b2, v1, v2, sb='U', path='./', prefix='', suffix='.fits', \n\
+		print("Syntax - mwispy.mosaic(l1, l2, b1, b2, v1, v2, sb='U', path='./', prefix='', suffix='.fits', \n\
 			undone=None, output='mosaic', weightcube=False, display=False, silent=False)")
 		return
 

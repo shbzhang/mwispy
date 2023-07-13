@@ -20,16 +20,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-import radio_beam
 from astropy.io import fits
+import astropy.units as u
 from astropy.units.quantity import Quantity
 from spectral_cube import SpectralCube, OneDSpectrum
 from spectral_cube.lower_dimensional_structures import Projection
 from astropy.convolution import Gaussian1DKernel, Box1DKernel
 from astropy.coordinates import SkyCoord
 from astropy.wcs import WCS
-from reproject import reproject_interp
-import astropy.units as u
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 
@@ -93,6 +91,7 @@ class DataCube(SpectralCube):
 
 	Spatial Smooth (cf. SpectralCube.convolve_to)
 	if cube has no beam info:
+	>>> import radio_beam
 	>>> beam = radio_beam.Beam(major=52*u.arcsec, minor=52*u.arcsec, pa=0*u.deg)
 	>>> cube = cube.with_beam(beam)
 	then smoothing:
@@ -822,7 +821,7 @@ class DataCube(SpectralCube):
 		>>> #do the baseline fitting
 		>>> fittedCube.baseline(deg=1)
 		>>> #calculate RMS
-		>>> rms = fittedCube.rms()
+		>>> rms = fittedCube.get_rms()
 		'''
 		if deg == 0:
 			p0 = self.mean(axis=0)._data
@@ -830,13 +829,13 @@ class DataCube(SpectralCube):
 		else:
 			channel = self.channel()
 			p = np.ndarray((deg+1, self.shape[1], self.shape[2]))
-			it = np.nditer(self._data[0], flags=['multi_index'])
-			while not it.finished:
-				spectrum = self._data[:, it.multi_index[0], it.multi_index[1]]
-				mask = self.mask.include()[:, it.multi_index[0], it.multi_index[1]] & np.isfinite(spectrum)
-				if mask.sum()>5:
-					p[:, it.multi_index[0], it.multi_index[1]] = np.polyfit(channel[mask], spectrum[mask], deg)
-				it.iternext()
+			for ix in tqdm(range(self.shape[2])):
+				for iy in range(self.shape[1]):
+					spectrum = self._data[:,iy,ix].copy()
+					mask = self.mask.include()[:,iy,ix] & np.isfinite(spectrum)
+					if mask.sum()>5:
+						p[:, iy, ix] = np.polyfit(channel[mask], spectrum[mask], deg)
+
 			for d in range(deg+1):
 				self._data -= p[-d-1,:,:]*self.channel()[:,np.newaxis,np.newaxis]**d
 
@@ -1268,11 +1267,11 @@ class DataCube(SpectralCube):
 
 if __name__ == '__main__':
 	#init
-	old = 'example/old.fits'
-	ref = 'example/ref.fits'
-	rms = 'example/rms.fits'
-	cxy = 'example/cxy.fits'
-	ycx = 'example/ycx.fits'
+	old = '/Users/shaobo/Work/script/mwisp_package_test/example/old.fits'
+	ref = '/Users/shaobo/Work/script/mwisp_package_test/example/ref.fits'
+	rms = '/Users/shaobo/Work/script/mwisp_package_test/example/rms.fits'
+	cxy = '/Users/shaobo/Work/script/mwisp_package_test/example/cxy.fits'
+	ycx = '/Users/shaobo/Work/script/mwisp_package_test/example/ycx.fits'
 	cube = DataCube.openMWISP(old)
 	print(cube,'\n')
 	#print(help(cube))
@@ -1366,12 +1365,12 @@ if __name__ == '__main__':
 
 	#test baseline
 	if 0:
-		new = cube[:,100:110, 120: 135].with_window(-1, 13, modex=[-19, 19])
+		new = cube[:,100:110, 120:135].with_window(-1, 13, modex=[-19, 19])
 
 		plt.step(new.velocity(), new._data[:,5,-2], 'k-')
 		plt.step(new.velocity(), new.mask.include()[:,5,-2])
 		
-		new.baseline(deg=0)
+		new.baseline(deg=2)
 		plt.step(new.velocity(), new._data[:,5,-2], 'r-')
 		plt.plot(new.velocity(), np.zeros(new.velocity().size))
 		plt.show()

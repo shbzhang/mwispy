@@ -78,7 +78,7 @@ def cubemoment(cubefile=None, crange=None, direction='v', threshold=-np.inf, zer
 
     #standardize and test input
     if (cubefile == None) or (crange == None):
-        print("Syntax - mwisp.cubemoment(cubefile, crange, direction='v', threshold=-inf, zeroth_only=False,")
+        print("Syntax - mwispy.cubemoment(cubefile, crange, direction='v', threshold=-inf, zeroth_only=False,")
         print("             coveragefile=None, goodlooking=False, rmsfile=None, outname=None)")
         return
 

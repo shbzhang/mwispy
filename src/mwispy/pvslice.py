@@ -82,9 +82,14 @@ def pvslice(fitsfile=None, path_coord=None, pathgal=True, width=1, step=0.5, spl
 
 	Examples
 	--------
+	>>> #path from array
 	>>> pvslice('XXX.fits', [[l1,l2,l3],[b1,b2,b3]], width=5, step=0.2)
+	>>>
+	>>> #path from file
 	>>> pvslice('XXX.fits', 'path.cat', pathgal=False, spline=True)
-	>>> from mwisp.mosaic import gauss2d
+	>>>
+	>>> #slice with gaussian kernel
+	>>> g2d = lambda dx,dy: np.exp(-(dx**2+dy**2)/2/2**2)
 	>>> pvslice('XXX.fits', 'path.cat', kernel=gauss2d)
 
 	Todo list
@@ -94,8 +99,8 @@ def pvslice(fitsfile=None, path_coord=None, pathgal=True, width=1, step=0.5, spl
 	'''
 
 	if (fitsfile == None) | (path_coord == None):
-		print('Syntax - mwisp.pvslice(fitsfile, catalog, width=1, step=0.5, pathgal=True, spline=False, kernel=None)')
-		print('Syntax - mwisp.pvslice(fitsfile, [a, d], width=1, step=0.5, pathgal=True, spline=False, kernel=None)')
+		print('Syntax - mwispy.pvslice(fitsfile, catalog, width=1, step=0.5, pathgal=True, spline=False, kernel=None)')
+		print('Syntax - mwispy.pvslice(fitsfile, [a, d], width=1, step=0.5, pathgal=True, spline=False, kernel=None)')
 		return
 
 	if not os.path.exists(fitsfile):

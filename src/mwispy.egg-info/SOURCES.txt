@@ -1,0 +1,15 @@
+LICENSE
+README.md
+pyproject.toml
+src/mwispy/__init__.py
+src/mwispy/converter.py
+src/mwispy/cubemoment.py
+src/mwispy/datacube.py
+src/mwispy/mosaic.py
+src/mwispy/pvslice.py
+src/mwispy/tile.py
+src/mwispy.egg-info/PKG-INFO
+src/mwispy.egg-info/SOURCES.txt
+src/mwispy.egg-info/dependency_links.txt
+src/mwispy.egg-info/requires.txt
+src/mwispy.egg-info/top_level.txt
