@@ -440,9 +440,9 @@ def mosaic(*crange, sb='U', path=None, prefix='', suffix='.fits', \
 	mscHdr['BUNIT'] = 'K (T_MB)'
 
 	if undone is None:
-		mscHdr.remove('OBJECT')
-		mscHdr.remove('GLAT')
-		mscHdr.remove('GLON')
+		mscHdr.remove('OBJECT', ignore_missing=True)
+		mscHdr.remove('GLAT', ignore_missing=True)
+		mscHdr.remove('GLON', ignore_missing=True)
 		mscHdr['HISTORY'] = 'MOSAIC: '+time.strftime("%b %d %Y %H:%M:%S", time.localtime())
 	else:
 		mscHdr['HISTORY'] = 'MOSAIC PATCH: '+time.strftime("%b %d %Y %H:%M:%S", time.localtime())
