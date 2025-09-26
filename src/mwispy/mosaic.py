@@ -1,6 +1,6 @@
 ' mwispy module: mosaic '
 
-__version__ = '2.0'
+__version__ = '2.1'
 __author__ = 'Shaobo Zhang'
 __all__ = ['mosaic']
 import os, time, glob, logging
@@ -15,6 +15,7 @@ valid_b1 = -12
 valid_b2 = 12
 ###output data type
 output_dtype = np.float32
+crval1 = 90.0
 
 def mosaic(*crange, sb='U', path=None, prefix='', suffix='.fits', \
 	undone=None, output='mosaic', weightcube=False, silent=False, display=False, ):
@@ -94,7 +95,11 @@ def mosaic(*crange, sb='U', path=None, prefix='', suffix='.fits', \
 		log file is added to the output set to help keyword "undone" to work better.
 		correct the CDELT1 error when MWISP-2 data are involving.
 		add keyword "prefix", "suffix" to mosaic cleaned datacubes.
-
+	Dec,17,2024,v2.1
+		no longer prompt "Error" if velocity range of cells are inconsistent.
+		mosaic can be done even if the velocity range of some cell datacubes were chopped differently.
+		zero will be filled if chopped range is smaller than that of mosaic.
+		modify default 'CRVAL1' from 0 to 90 to get correct WCS
 
 	Examples
 	--------
@@ -162,7 +167,7 @@ def mosaic(*crange, sb='U', path=None, prefix='', suffix='.fits', \
 		###get shape of output FITS
 		mscNX = int(floor(l2*120) - ceil(l1*120) + 1)
 		if mscNX==0: mscNX = 1
-		mscCX = int(floor(l2*120) + 1)
+		mscCX = int(floor((l2-crval1)*120) + 1)
 		mscNY = int(floor(b2*120) - ceil(b1*120) + 1)
 		mscCY = int(-ceil(b1*120) + 1)	#1-base for FITS file
 		mscCells = []
@@ -183,6 +188,7 @@ def mosaic(*crange, sb='U', path=None, prefix='', suffix='.fits', \
 			b2 = _cary2b(mscHdr, mscNY-1)
 			v1 = _c2v(mscHdr, 0)
 			v2 = _c2v(mscHdr, mscNC-1)
+			crval1 = mscHdr['CRVAL1']
 
 			mscHdr = fits.getheader(_getMosaicWeightName(undone, sb))
 			if mscHdr['NAXIS']>2: weightcube=True
@@ -220,6 +226,7 @@ def mosaic(*crange, sb='U', path=None, prefix='', suffix='.fits', \
 			index += 1
 			cellName = _getCellName(cellLx10, cellBx10)
 
+			### check if a cell is already mosaicked when resuming a undone mosaic.
 			if undone is not None:
 				if cellName in mscCells:
 					_prompt('[%d/%d]%s%s: mosaic is already in the undone.' % (index, cellNum, cellName, sb))
@@ -257,28 +264,55 @@ def mosaic(*crange, sb='U', path=None, prefix='', suffix='.fits', \
 				cellHdr = cellCubeHDU.header
 				cellDat = cellCubeHDU.data
 
+				### Unify to 4 dimension
 				while cellDat.ndim<4: cellDat = cellDat[np.newaxis]
 
-				###Clip velocity
+				### Clip velocity
 				nc = cellHdr['NAXIS3']
 				cv = cellHdr['CRVAL3']
 				cp = cellHdr['CRPIX3']
 				cd = cellHdr['CDELT3']
-				#flip if necessary
+				#flip channels if necessary
 				if cd < 0:
 					cellDat = np.flip(cellDat, axis=-3)
 					cd = -cd
 					cp = nc-cp+1
-				#regulate channel range
+
+				### get channel range to extract
 				c1 = int(floor((v1*1e3 - cv) / cd + cp -1))	#convert faster than v2c
 				c2 = int(ceil((v2*1e3 - cv) / cd + cp -1))
 				if c1 > nc-1 or c2 < 0: #out of range
 					_prompt('Error - Velocity from %f to %s is out of the range!' % (v1, v2))
 					return
+
+
+				### extract channel, fill nan if c1<0 or c2>nc-1
+				shp = list(cellDat.shape)
+				if c1>=0:
+					cellDat = np.take(cellDat, range(c1, nc), axis=-3)
+					padBefore = None
+				else:
+					shp[-3] = -c1
+					padBefore = np.empty(shp)
+					padBefore[:] = np.nan
+				if c2<=nc-1:
+					cellDat = np.take(cellDat, range(0, cellDat.shape[-3]-nc+c2+1), axis=-3)
+					padAfter = None
+				else:
+					shp[-3] = c2-nc+1
+					padAfter = np.empty(shp)
+					padAfter[:] = np.nan
+
+				if padBefore is not None: cellDat = np.concatenate((padBefore, cellDat), axis=-3)
+				if padAfter is not None: cellDat = np.concatenate((cellDat, padAfter), axis=-3)
+
+				### revise keyword
+				'''
 				if c1 < 0: c1 = 0
 				if c2 > nc-1: c2 = nc-1
 				#cellDat = cellDat[:, c1:c2+1, :, :]
 				cellDat = np.take(cellDat, range(c1,c2+1), axis=-3)
+				'''
 				cellHdr['NAXIS3'] = c2-c1+1
 				cellHdr['CRPIX3'] = cp-c1
 				cellHdr['CDELT3'] = cd
@@ -319,8 +353,7 @@ def mosaic(*crange, sb='U', path=None, prefix='', suffix='.fits', \
 			###Check SHAPE !!!
 
 
-
-			#cube and weight are ready
+			#cube and weight are ready, it is a valid cell
 			valid += 1
 
 			#initiate a mosaic cube and header
@@ -350,19 +383,26 @@ def mosaic(*crange, sb='U', path=None, prefix='', suffix='.fits', \
 				mscV2 = _c2v(mscHdr, mscHdr['NAXIS3']-1)
 			else:
 				#check velocity consistency
+				### check velocity before, but only velocity
 				sameNC = mscHdr['NAXIS3'] == cellHdr['NAXIS3']	#consistent channel number
 				sameV1 = abs(_c2v(cellHdr,0) - mscV1) < mscHdr['CDELT3']/1e3	#consistent velocity range
 				sameV2 = abs(_c2v(cellHdr,cellHdr['NAXIS3']-1) - mscV2) < mscHdr['CDELT3']/1e3
+				'''
+				mscV0 = mscHdr['CRVAL3'] % abs(mscHdr['CDELT3'])
+				cellV0 = cellHdr['CRVAL3'] % abs(cellHdr['CDELT3'])
+				sameV0 = (mscV0 - cellV0) / mscV0 < 1e-4
+				sameVD = abs((mscHdr['CDELT3'] - cellHdr['CDELT3']) / mscHdr['CDELT3']) < 1e-4
+				'''
 				if not (sameNC and sameV1 and sameV2):
 					_prompt('Error - Inconsistent velocity dimension!')
 					continue
-
+				
 
 			#mosaic dat to mscDat
 			cellDat *= cellWei
 
 			###clip cube/weight
-			cellCX = mscCX-cellLx10*12-1
+			cellCX = mscCX-(cellLx10-int(crval1*10))*12-1
 			cellCY = mscCY+cellBx10*12-1
 			cellNX = cellHdr['NAXIS1']
 			cellNY = cellHdr['NAXIS2']
@@ -422,7 +462,7 @@ def mosaic(*crange, sb='U', path=None, prefix='', suffix='.fits', \
 	mscHdr['NAXIS2'] = mscNY
 	mscHdr['CTYPE1'] = 'GLON-CAR'
 	mscHdr['CTYPE2'] = 'GLAT-CAR'
-	mscHdr['CRVAL1'] = 0.
+	mscHdr['CRVAL1'] = crval1
 	mscHdr['CRVAL2'] = 0.
 	mscHdr['CDELT1'] = -30/3600
 	mscHdr['CDELT2'] = 30/3600
@@ -474,7 +514,6 @@ def mosaic(*crange, sb='U', path=None, prefix='', suffix='.fits', \
 def _getCellName(gl, gb):
 	gl = gl % 3600
 	return '%04d%+04d' % (gl, gb)
-
 def _getCellCubeName(path, prefix, cellName, sb, suffix):
 	return os.path.join(path, '%s%s%s%s' % (prefix[0], cellName, sb, suffix[0]))
 def _getCellRmsName(path, prefix, cellName, sb, suffix):
@@ -505,11 +544,25 @@ def _v2c(hdr, v):
 	return c
 
 if __name__ == '__main__':
-	#mosaic()
+	if 1:
+		import random
+		f = lambda cell:'/share/data/mwisp/G%2s0+00/%sL.fits' % (cell[:2], cell)
+		for l in range(2235, 2245, 5):
+			for b in range(-10, 0, 5):
+				cell = _getCellName(l, b)
+				print(cell, f(cell))
+				c1 = random.randint(-200, -50) + 10826
+				c2 = random.randint(50, 200) + 10826
+				hdu = fits.open(f(cell))[0]
+				hdu.data = np.take(hdu.data, range(c1,c2+1), axis=-3)
+				hdu.header['NAXIS3'] = c2-c1+1
+				hdu.header['CRPIX3'] = hdu.header['CRPIX3']-c1
+				hdu.writeto(cell+'L.fits', overwrite=True)
+	mosaic(223,224.5,-1.5,0,-24,24, sb='L',path=['.', '/share/data/mwisp/G220+00'])
 	#mosaic(95.5, 97, 4.5, 6, -10, 10, path='/Users/shaobo/Downloads/', output='mosaic', weightcube=True)
 	#mosaic(95.5, 97, 4.5, 6, -120, 120, path='/Users/shaobo/Downloads/', output='clip1', weightcube=True, prefix=('CLIP',''))
 	#mosaic(path='/Users/shaobo/Downloads/', output='clip3', undone='clip1', weightcube=True, prefix=('CLIP',''))
 
 	#mosaic(214,217,-1,2,-300,300, path='/share/public/qzyanShare/mwispIfinal/longBaseClean/all_cubes/', output='test1', prefix='NC')
-	mosaic(214,217,-1,2,-300,300, path='/share/public/qzyanShare/mwispIfinal/longBaseClean/CO13/all_cubes', output='test1', prefix='NC', sb='L')
+	#mosaic(214,217,-1,2,-300,300, path='/share/public/qzyanShare/mwispIfinal/longBaseClean/CO13/all_cubes', output='test1', prefix='NC', sb='L')
 
