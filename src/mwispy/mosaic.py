@@ -8,14 +8,6 @@ import numpy as np
 from astropy.io import fits
 from math import floor, ceil
 
-###the valid l/b range of mosaic, slightly larger than the MWISP project.
-valid_l1 = -11
-valid_l2 = 251
-valid_b1 = -12
-valid_b2 = 12
-###output data type
-output_dtype = np.float32
-crval1 = 90.0
 
 def mosaic(*crange, sb='U', path=None, prefix='', suffix='.fits', \
 	undone=None, output='mosaic', weightcube=False, silent=False, display=False, ):
@@ -106,6 +98,15 @@ def mosaic(*crange, sb='U', path=None, prefix='', suffix='.fits', \
 	>>> pa = ['./', '/share/data/mwisp/G020+00', '/share/data/mwisp/G030+00']
 	>>> mwispy.mosaic(29, 32.5, -1, 1.2, -30, 30, sb='L', path=pa, output='Test', silent=True)
 	'''
+
+	###the valid l/b range of mosaic, slightly larger than the MWISP project.
+	valid_l1 = -11
+	valid_l2 = 251
+	valid_b1 = -12
+	valid_b2 = 12
+	###output data type
+	output_dtype = np.float32
+	crval1 = 90.0
 
 	###Syntax prompt
 	if len(crange) != 6 and undone is None:
